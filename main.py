@@ -17,7 +17,6 @@ def run_web():
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
 
-# توكن بوت المهام
 BOT_TOKEN = "8024260311:AAEBr2g5fzJwJQv4STgVnLfULq6BdQC_Gsg"
 bot = telebot.TeleBot(BOT_TOKEN)
 
@@ -45,14 +44,14 @@ def start(message):
 @bot.message_handler(func=lambda msg: msg.text == "➕ إضافة مهام اليوم")
 def add_task_mode(message):
     user_states[message.chat.id] = "adding"
-    bot.send_message(message.chat.id, "اكتب مهامك اليوم، كل مهمة في رسالة. لما تخلص اكتب تماماً: /done")
+    bot.send_message(message.chat.id, "اكتب مهامك اليوم، كل مهمة في رسالة. لما تخلص اضغط هنا: /done", reply_markup=main_menu())
 
 @bot.message_handler(func=lambda msg: msg.text == "/done")
 def finish_adding(message):
     user_states[message.chat.id] = "idle"
-    bot.send_message(message.chat.id, "تم حفظ المهام بنجاح! تقدر تراجعها من القائمة.", reply_markup=main_menu())
+    bot.send_message(message.chat.id, "تم حفظ المهام بنجاح!", reply_markup=main_menu())
 
-@bot.message_handler(func=lambda msg: user_states.get(msg.chat.id) == "adding")
+@bot.message_handler(func=lambda msg: user_states.get(msg.chat.id) == "adding" and msg.text not in ["➕ إضافة مهام اليوم", "📝 مراجعة المهام", "📊 تقرير إنجاز الشهر", "/done"])
 def save_task(message):
     today = datetime.now().strftime("%Y-%m-%d")
     conn = sqlite3.connect("tasks.db")
@@ -64,6 +63,7 @@ def save_task(message):
 
 @bot.message_handler(func=lambda msg: msg.text == "📝 مراجعة المهام")
 def review_tasks(message):
+    user_states[message.chat.id] = "idle"
     today = datetime.now().strftime("%Y-%m-%d")
     conn = sqlite3.connect("tasks.db")
     cursor = conn.cursor()
@@ -72,7 +72,7 @@ def review_tasks(message):
     conn.close()
 
     if not tasks:
-        bot.send_message(message.chat.id, "لا توجد مهام جديدة بانتظار التنفيذ اليوم!")
+        bot.send_message(message.chat.id, "لا توجد مهام جديدة بانتظار التنفيذ اليوم!", reply_markup=main_menu())
         return
     
     for task in tasks:
@@ -102,6 +102,7 @@ def callback(call):
 
 @bot.message_handler(func=lambda msg: msg.text == "📊 تقرير إنجاز الشهر")
 def report(message):
+    user_states[message.chat.id] = "idle"
     conn = sqlite3.connect("tasks.db")
     cursor = conn.cursor()
     cursor.execute("SELECT task_name, date, status FROM daily_log")
@@ -115,7 +116,7 @@ def report(message):
         writer.writerows(rows)
     
     with open(file_path, "rb") as f:
-        bot.send_document(message.chat.id, f)
+        bot.send_document(message.chat.id, f, reply_markup=main_menu())
 
 if __name__ == "__main__":
     Thread(target=run_web).start()
