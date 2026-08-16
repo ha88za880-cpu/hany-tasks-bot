@@ -20,7 +20,6 @@ def run_web():
 BOT_TOKEN = "8024260311:AAEBr2g5fzJwJQv4STgVnLfULq6BdQC_Gsg"
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# قائمة المهام الجاهزة اللي بتكررها دايما
 DEFAULT_TASKS = ["قراءة تقارير", "مراجعة حضور الموظفين", "متابعة السلامة المهنية", "تحديث ملفات الإكسيل"]
 
 def init_db():
@@ -40,7 +39,7 @@ def main_menu():
 
 @bot.message_handler(commands=['start'])
 def start(message):
-    bot.send_message(message.chat.id, "أهلاً يا هاني، اختار المهمة اللي عايز تضيفها:", reply_markup=main_menu())
+    bot.send_message(message.chat.id, "أهلاً بيك! اختار المهمة اللي عايز تضيفها:", reply_markup=main_menu())
 
 @bot.message_handler(func=lambda msg: msg.text == "📋 مهام جاهزة")
 def show_default_tasks(message):
@@ -90,7 +89,7 @@ def review_tasks(message):
         markup.add(types.InlineKeyboardButton("تمت ✅", callback_data=f"done|{task[0]}"))
         bot.send_message(message.chat.id, f"📌 {task[1]}", reply_markup=markup)
 
-@bot.callback_query_handler(func=lambda call: True)
+@bot.callback_query_handler(func=lambda call: call.data.startswith("done|"))
 def callback(call):
     task_id = call.data.split("|")[1]
     conn = sqlite3.connect("tasks.db")
@@ -103,8 +102,18 @@ def callback(call):
 @bot.message_handler(func=lambda msg: msg.text == "⬅️ رجوع" or msg.text == "📊 تقرير الشهر")
 def handle_other(message):
     if message.text == "📊 تقرير الشهر":
-        # كود التقرير هنا...
-        bot.send_message(message.chat.id, "تم تجهيز التقرير...", reply_markup=main_menu())
+        conn = sqlite3.connect("tasks.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT task_name, date, status FROM daily_log")
+        rows = cursor.fetchall()
+        conn.close()
+        file_path = "Monthly_Report.csv"
+        with open(file_path, "w", newline="", encoding="utf-8-sig") as f:
+            writer = csv.writer(f)
+            writer.writerow(["المهمة", "التاريخ", "الحالة"])
+            writer.writerows(rows)
+        with open(file_path, "rb") as f:
+            bot.send_document(message.chat.id, f, reply_markup=main_menu())
     else:
         bot.send_message(message.chat.id, "تم الرجوع:", reply_markup=main_menu())
 
